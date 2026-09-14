@@ -1,0 +1,28 @@
+name: Checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python rendezvous relay
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Check Python syntax
+        run: python3 -m compileall -q relay.py agent_relay tests
+
+      - name: Check launcher syntax
+        run: bash -n run.sh
+
+      - name: Run regression tests
+        run: python3 -m unittest discover -s tests -v

@@ -1,0 +1,24 @@
+[Unit]
+Description=Agent rendezvous relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agent-relay
+Group=agent-relay
+StateDirectory=agent-relay
+WorkingDirectory=/var/lib/agent-relay
+ExecStart=/usr/bin/python3 /opt/agent-relay/relay.py --listen 127.0.0.1:8787 --api-key-file /etc/agent-relay/api.key --database /var/lib/agent-relay/pairings.sqlite3
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_INET AF_INET6
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target
