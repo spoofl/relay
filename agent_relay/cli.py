@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 import contextlib
+import errno
 import logging
 import os
 from pathlib import Path
@@ -18,6 +19,18 @@ from .sessions import Sessions
 logger = logging.getLogger(__name__)
 
 PURGE_INTERVAL_SECONDS = 3600
+
+
+async def _listen(handler, host, port):
+    while True:
+        try:
+            return await asyncio.start_server(handler, host, port, limit=MAX_HEAD)
+        except OSError as error:
+            if error.errno != errno.EADDRINUSE or port == 0:
+                raise
+            next_port = port + 1 if port < 65535 else 0
+            logger.info("HTTP    port %d occupied; trying port %d", port, next_port)
+            port = next_port
 
 
 async def _purge_idle(sessions):
@@ -39,12 +52,13 @@ async def run(args, ready=None):
     sessions = Sessions(args.database, args.session_ttl_hours * 3600)
     relay = Relay(sessions, key, args.poll_seconds)
     sessions.purge()
-    server = await asyncio.start_server(relay.http, *bind, limit=MAX_HEAD)
+    server = await _listen(relay.http, *bind)
+    args.listen = peer_address(server.sockets[0].getsockname())
     purge = asyncio.create_task(_purge_idle(sessions))
     try:
         logger.info("READY   relay serving %d pairing(s) | server=%s", sessions.count(), sessions.server_id)
         logger.info("HTTP    listening on %s | held polls %ds | session traffic logs at DEBUG",
-                    peer_address(server.sockets[0].getsockname()), args.poll_seconds)
+                    args.listen, args.poll_seconds)
         stop = asyncio.Event()
         for sig in (signal.SIGTERM, signal.SIGINT):
             loop.add_signal_handler(sig, stop.set)
@@ -63,14 +77,14 @@ async def run(args, ready=None):
 def started(args):
     where = f"logs at {args.log_file}" if args.log_file else "logs discarded without --log-file"
     if not args.background:
-        return f"Relay started; {where}\n"
-    return f"Relay running in the background (PID {os.getpid()}); {where}\nStop it with: kill {os.getpid()}\n"
+        return f"Relay started on {args.listen}; {where}\n"
+    return f"Relay running in the background (PID {os.getpid()}) on {args.listen}; {where}\nStop it with: kill {os.getpid()}\n"
 
 
 def main():
     parser = argparse.ArgumentParser(description="Rendezvous relay joining the desktop app and its paired phone")
     parser.add_argument("--listen", default="127.0.0.1:8787",
-                        help="Loopback address to serve; publish it through a TLS reverse proxy")
+                        help="Preferred loopback address (default: 127.0.0.1:8787); try higher ports if occupied")
     parser.add_argument("--api-key-file", required=True)
     parser.add_argument("--database", default="pairings.sqlite3")
     parser.add_argument("--poll-seconds", type=int, default=25,

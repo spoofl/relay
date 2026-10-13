@@ -12,13 +12,17 @@ Python 3.10+, standard library only.
 ./run.sh
 ```
 
-This starts the relay on `127.0.0.1:8787`. It creates `api.key` on first run
+This starts the relay on `127.0.0.1:8787`, trying successive ports if one is
+occupied. `--listen` sets the preferred address; port `0` lets the system
+choose an available port. The selected address appears in the startup log
+and in the startup message when using `--background` or `--log-file`.
+It creates `api.key` on first run
 and prints the key for you to paste into the desktop app; set
 `RELAY_PRINT_API_KEY=0` to stop printing it. `./run.sh --help` lists the other
 options. In production, use the systemd unit `agent-relay.service` instead.
 
 The relay listens only on loopback, so publish it through a TLS reverse proxy
-on a neutral hostname you control:
+on a neutral hostname you control. Set `proxy_pass` to the selected address:
 
 ```nginx
 server {
