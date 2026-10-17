@@ -8,11 +8,11 @@ key_file="api.key"
 while (( $# > 0 )); do
     case "$1" in
         -h|--help)
-            exec python3 "$script_dir/relay.py" "${args[@]}"
+            exec "${PY:-python3}" "$script_dir/relay.py" "${args[@]}"
             ;;
         --api-key-file)
             if (( $# < 2 )) || [[ $2 == -* && $2 != - ]]; then
-                exec python3 "$script_dir/relay.py" "${args[@]}"
+                exec "${PY:-python3}" "$script_dir/relay.py" "${args[@]}"
             fi
             key_file="$2"
             shift
@@ -24,7 +24,7 @@ while (( $# > 0 )); do
     shift
 done
 
-python3 - "$key_file" <<'PY'
+"${PY:-python3}" - "$key_file" <<'PY'
 import os
 from pathlib import Path
 import secrets
@@ -47,4 +47,4 @@ except OSError as error:
 PY
 
 # Replace Bash so the relay receives signals and returns its exit status directly.
-exec python3 "$script_dir/relay.py" --api-key-file "$key_file" "${args[@]}"
+exec "${PY:-python3}" "$script_dir/relay.py" --api-key-file "$key_file" "${args[@]}"

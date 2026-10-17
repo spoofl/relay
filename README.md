@@ -21,6 +21,17 @@ and prints the key for you to paste into the desktop app; set
 `RELAY_PRINT_API_KEY=0` to stop printing it. `./run.sh --help` lists the other
 options. In production, use the systemd unit `agent-relay.service` instead.
 
+The launcher requires Bash and runs in the foreground by default. It works
+from any directory; relative key and database paths stay relative to your
+current directory. Set `PY=/path/to/python3` to select another Python
+interpreter. `make run` is an optional shortcut through the same launcher:
+
+```sh
+make run
+make run ARGS='--listen 127.0.0.1:8787 --database pairings.sqlite3'
+make run ARGS='--help'
+```
+
 The relay listens only on loopback, so publish it through a TLS reverse proxy
 on a neutral hostname you control. Set `proxy_pass` to the selected address:
 
@@ -45,6 +56,33 @@ server {
     location / { return 404; }
 }
 ```
+
+## Run as a service
+
+Install `run.sh`, `relay.py`, and `agent_relay/` under `/opt/agent-relay/`,
+keep `run.sh` executable (`chmod +x /opt/agent-relay/run.sh`), create a
+dedicated `agent-relay` user, and store the key in `/etc/agent-relay/api.key`
+(readable only by that user and root). Install `agent-relay.service` under
+`/etc/systemd/system/`, then enable it:
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable --now agent-relay
+sudo systemctl status agent-relay
+```
+
+The unit starts the same `run.sh` in the foreground, suppresses API key output,
+and sends logs to the journal. Systemd handles background operation, startup on
+reboot, and restarts after failures; do not add `--background` or `--log-file`
+to its command. Pairings are stored in `/var/lib/agent-relay/pairings.sqlite3`.
+Use `sudo systemctl restart agent-relay` after an update,
+`sudo systemctl stop agent-relay` to stop it, and
+`journalctl -u agent-relay -f` to follow logs. When updating an existing
+installation, copy the launcher along with the Python files before installing
+the updated unit.
+
+Reserve loopback port 8787 for the relay and point the reverse proxy at it.
+When hosting payload-store on the same VPS, use its service's port 8790.
 
 ## API
 
